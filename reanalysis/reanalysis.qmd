@@ -129,14 +129,65 @@ the original data only has a colum "condition" with all for combinations across 
 
 ```{r}
 # changing data frame
-data_adjusted <- data_ex1 |>
-  mutate(distractor type)
+data_adjusted_1 <- data_ex1 |>
+  # creating a column for distractor type
+  mutate(type = case_when(condition == "category" ~ "Categorical",
+                                     condition == "unrelated_cat" ~ "Categorical",
+                                     condition == "mediated" ~ "Mediated",
+                                     condition == "unrelated_med" ~ "Mediated"),
+         # creating a column for distractor relatedness
+         relatedness = case_when(condition == "category" ~ "related",
+                                 condition == "mediated" ~ "related",
+                                 condition == "unrelated_cat" ~ "unrelated",
+                                 condition == "unrelated_med" ~ "unrelated"))|>
+  # coding new columns as factors
+  mutate(type = as.factor(type),
+         relatedness = as.factor(relatedness))
+# looking at new data frame
+data_adjusted_1
+# double checking levels
+levels(data_adjusted_1$type)
+levels(data_adjusted_1$relatedness)
+# changing contrasts for sum-coding
+contrasts(data_adjusted_1$type) <- c(-0.5, 0.5)
+contrasts(data_adjusted_1$relatedness) <- c(0.5, -0.5)
 
-# preparing the data for sum-coding
+# fitting a mixed effects linear model
+ex1_mdl_max <- lmer(rt ~ type * relatedness +
+                      (1+type|participant)+(1+type|pic),
+                    data = data_adjusted_1,
+                    control = lmerControl(optimizer = "bobyqa"))
+# I only get the warning message "boundary (singular) fit: see help('isSingular')" - not really that it didn't converge
 
+# removing correlation between random slpes and intercepts
+ex1_mdl_less <- lmer(rt ~ type * relatedness +
+                       (1+type||participant)+(1+type||pic),
+                    data = data_adjusted_1,
+                    control = lmerControl(optimizer = "bobyqa"))
+# same warning message
 
+#### need to check varience of each random effect slope! How?
 
-contrasts(data_trimmed$condition) <- 
+# fitting the final model
+ex1_mdl_final <- lmer(rt ~ type * relatedness +
+                       (1+relatedness||participant)+(1|pic),
+                    data = data_adjusted_1,
+                    control = lmerControl(optimizer = "bobyqa"))
+# I still get the same error message!?
+
+# checking residuals visually
+res1 <- residuals(ex1_mdl_final)
+# creating matrix
+par(mfrow = c(1,3))
+# Plot 1, histogram
+hist(res1)
+# Plot 2, Q-Q plot
+qqnorm(res1)
+qqline(res1)
+# Plot 3, residual plot
+plot(fitted(ex1_mdl_final), res1)
+
+# while they report, that the residuals did not violate normality assumptions, the visual assessment in this reanalysis shows a clear pattern in all three plots that indicated that the underlying data does not come from a normal distribution. The histogram is skewed, the line is clearly not straight and the dots in the third plot are not equally spread, but clustered in the lower left part of the plot.
 
 ```
 
@@ -179,6 +230,10 @@ data_trimmed <- data_filtered |>
 count(data_filtered)-count(data_trimmed)
 # same amount of trials as in paper
 
+# renaming data to make it easier:
+
+data_ex2 <- data_trimmed
+
 ```
 
 ## Reproducing Table 4
@@ -186,7 +241,7 @@ count(data_filtered)-count(data_trimmed)
 ```{r}
 # mean RT for each condition
 
-mean_RT <- data_trimmed |>
+mean_RT <- data_ex2 |>
   # grouping by condition
   group_by(condition)|>
   # calculating mean of reaction time and rounding on 2 digits
@@ -235,14 +290,65 @@ the original data only has a colum "condition" with all for combinations across 
 
 ```{r}
 # changing data frame
-data_adjusted <- data_trimmed |>
-  mutate(distractor type)
+data_adjusted_2 <- data_ex2 |>
+  # creating a column for distractor type
+  mutate(type = case_when(condition == "category" ~ "Categorical",
+                                     condition == "unrelated_cat" ~ "Categorical",
+                                     condition == "mediated" ~ "Mediated",
+                                     condition == "unrelated_med" ~ "Mediated"),
+         # creating a column for distractor relatedness
+         relatedness = case_when(condition == "category" ~ "related",
+                                 condition == "mediated" ~ "related",
+                                 condition == "unrelated_cat" ~ "unrelated",
+                                 condition == "unrelated_med" ~ "unrelated"))|>
+  # coding new columns as factors
+  mutate(type = as.factor(type),
+         relatedness = as.factor(relatedness))
+# looking at new data frame
+data_adjusted_2
+# double checking levels
+levels(data_adjusted_2$type)
+levels(data_adjusted_2$relatedness)
+# changing contrasts for sum-coding
+contrasts(data_adjusted_2$type) <- c(-0.5, 0.5)
+contrasts(data_adjusted_2$relatedness) <- c(0.5, -0.5)
 
-# preparing the data for sum-coding
+# fitting a mixed effects linear model
+ex2_mdl_max <- lmer(rt ~ type * relatedness +
+                      (1+type|participant)+(1+type|pic),
+                    data = data_adjusted_2,
+                    control = lmerControl(optimizer = "bobyqa"))
+# I only get the warning message "boundary (singular) fit: see help('isSingular')" - not really that it didn't converge
 
+# removing correlation between random slpes and intercepts
+ex2_mdl_less <- lmer(rt ~ type * relatedness +
+                       (1+type||participant)+(1+type||pic),
+                    data = data_adjusted_1,
+                    control = lmerControl(optimizer = "bobyqa"))
+# same warning message
 
+#### need to check varience of each random effect slope! How?
 
-contrasts(data_trimmed$condition) <- 
+# fitting the final model
+ex2_mdl_final <- lmer(rt ~ type * relatedness +
+                       (1+relatedness||participant)+(1|pic),
+                    data = data_adjusted_1,
+                    control = lmerControl(optimizer = "bobyqa"))
+# I still get the same error message!?
+
+# checking residuals visually
+res2 <- residuals(ex2_mdl_final)
+# creating matrix
+par(mfrow = c(1,3))
+# Plot 1, histogram
+hist(res2)
+# Plot 2, Q-Q plot
+qqnorm(res2)
+qqline(res2)
+# Plot 3, residual plot
+plot(fitted(ex2_mdl_final), res2)
+
+# while they report, that the residuals did not violate normality assumptions, the visual assessment in this reanalysis shows a clear pattern in all three plots that indicated that the underlying data does not come from a normal distribution. The histogram is skewed, the line is clearly not straight and the dots in the third plot are not equally spread, but clustered in the lower left part of the plot.
 
 ```
 
