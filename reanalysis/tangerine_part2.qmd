@@ -32,7 +32,7 @@ relatedness: We add this column later, either the distractor is related or unrel
 
 ## 1- Analytical reproduction
 
-```{r}
+```{r setting directory}
 #| echo: false
 
 ## Thank you Timo for this code that helps reproducibility
