@@ -1,0 +1,249 @@
+---
+title: "Re-analysis"
+format: html
+editor: visual
+---
+
+# Re-analysis of paper \*Mediated phonological–semantic priming in spoken word production: Evidence for cascaded processing from picture–word interference\*
+
+# Experiment 2
+
+## Preamble: Loading packages and configuration
+
+```{r}
+#| label: data_and_libraries
+#| echo: false
+
+# just run this code chunk
+# function to ignoring the setting of the relative path below when knitting
+run_if_not_knitting <- function(expr) {
+  if (!isTRUE(getOption("knitr.in.progress"))) {
+    eval(expr)
+  }
+}
+
+# nifty code using the pacman package
+# it checks if the packages specified below are installed, if not, they will be installed, if yes, they will be loaded
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(rstudioapi, tidyverse, lme4, trimr)
+
+# set the current working directory to the one where this file is
+run_if_not_knitting(current_working_dir <- dirname(rstudioapi::getActiveDocumentContext()$path))
+run_if_not_knitting(setwd(current_working_dir))
+
+```
+
+# Experiment 1
+
+## Preparation
+
+downloading data_written from their osf repository: https://osf.io/65f7w/overview and storing in the same folder as this quarto document
+
+```{r preparing data}
+# loading the data file
+aud_data_raw <- read_csv("data_auditory.csv")
+
+# filtering data following their description in paper
+aud_data_filtered <- aud_data_raw|>
+  # excluding speech errors
+  filter(accuracy == 1) |>
+  # excluding empty audio files
+  filter(rt > 0)
+
+# checking how many trials got excluded
+count(aud_data_raw)-count(aud_data_filtered)
+# We excluded 67 trials just as they said in the paper
+
+# continuing filtering the data with the "trimr" package
+aud_data_trimmed <- aud_data_filtered |>
+  # excluding RT below 250ms
+  sdTrim(minRT = 250,
+         # excluding RT above mean+3*sd per participant
+         sd = 3,
+         perCondition = FALSE,
+         perParticipant = TRUE,
+         returnType = "raw")
+# in paper they say that the excluced -3sd too,
+# but that cannot be done with the sdTrim function
+
+# checking how much data we excluded:
+count(aud_data_filtered)-count(aud_data_trimmed)
+# while we only excluded 48 trials, the paper reports that 57 trials where removed 
+
+# renaming data to make it easier
+data_ex1 <- aud_data_trimmed
+
+```
+
+## Reproducing Table 3
+
+```{r}
+# mean RT for each condition
+
+mean_RT <- data_ex1 |>
+  # grouping by condition
+  group_by(condition)|>
+  # calculating mean of reaction time and rounding on 2 digits
+  summarize(mean = round(mean(rt),2),
+            sd = round(sd(rt),2))
+  
+  
+  
+# making a df that displays data just like table 3 in their paper
+# reordering the conditions
+condition <- c("Categorically related",
+               "Unrelated",
+               "Semantic inference",
+               "Mediated phonological-semantical",
+               "Unrelated",
+               "Semantic inference")
+# extracting mean rt in the same order
+M <- c(mean_RT$mean[1],
+          mean_RT$mean[3],
+          mean_RT$mean[1]-mean_RT$mean[3], 
+          mean_RT$mean[2],
+          mean_RT$mean[4],
+          mean_RT$mean[2]-mean_RT$mean[4])
+# extracting sd in the same order
+SD <- c(mean_RT$sd[1],
+        mean_RT$sd[3],
+        "",
+        mean_RT$sd[2],
+        mean_RT$sd[4],
+        "")
+# making a tibble out if the objects containing the new order
+table_3 <- tibble(Distractor_Type = condition,
+       M = M,
+       SD = SD)
+
+table_3
+# The mean rt for each condition if not the same as reported in the paper, for the Categorically related and unrelated mean rt, the differences are only minor (0.26 and 0.76 ms), for the mediated phonological-semantical related and unrelated distractor types, the differences are a bigger (1.33 and 0.77 ms).
+# The results reported for the sd cannot be reproduced at all. Differences between their and our results are around 70ms for all 4 categories.
+           
+
+```
+
+## LME analysis
+
+the original data only has a colum "condition" with all for combinations across distractor type and distractor relatedness. In their paper, however, the researchers report to have two fixed effects: distractor type and distractor relatedness Therefore, the data frame needs to be adjusted for the model to be able to know what to do
+
+```{r}
+# changing data frame
+data_adjusted <- data_ex1 |>
+  mutate(distractor type)
+
+# preparing the data for sum-coding
+
+
+
+contrasts(data_trimmed$condition) <- 
+
+```
+
+## notes about their analysis:
+
+# Experiment 2
+
+## Preparation
+
+downloading data_written from their osf repository: https://osf.io/65f7w/overview and storing in the same folder as this quarto document
+
+```{r preparing data}
+# loading the data file
+data_raw <- read_csv("data_written.csv")
+
+# filtering data following their description in paper
+data_filtered <- data_raw|>
+  # excluding speech errors
+  filter(accuracy == 1) |>
+  # excluding empty audio files
+  filter(rt > 0)
+
+# checking how many trials got excluded
+count(data_raw)-count(data_filtered)
+# We excluded 108 trials just as they said in the paper
+
+# continuing filtering the data with the "trimr" package
+data_trimmed <- data_filtered |>
+  # excluding RT below 250ms
+  sdTrim(minRT = 250,
+         # excluding RT above mean+3*sd per participant
+         sd = 3,
+         perCondition = FALSE,
+         perParticipant = TRUE,
+         returnType = "raw")
+# in paper they say that the excluced -3sd too,
+# but that cannot be done with the sdTrim function
+
+# checking how much data we excluded:
+count(data_filtered)-count(data_trimmed)
+# same amount of trials as in paper
+
+```
+
+## Reproducing Table 4
+
+```{r}
+# mean RT for each condition
+
+mean_RT <- data_trimmed |>
+  # grouping by condition
+  group_by(condition)|>
+  # calculating mean of reaction time and rounding on 2 digits
+  summarize(mean = round(mean(rt),2),
+            sd = round(sd(rt),2))
+  
+  
+  
+# making a df that displays data just like table 4 in their paper
+# reordering the conditions
+condition <- c("Categorically related",
+               "Unrelated",
+               "Semantic inference",
+               "Mediated phonological-semantical",
+               "Unrelated",
+               "Semantic inference")
+# extracting mean rt in the same order
+M <- c(mean_RT$mean[1],
+          mean_RT$mean[3],
+          mean_RT$mean[1]-mean_RT$mean[3], 
+          mean_RT$mean[2],
+          mean_RT$mean[4],
+          mean_RT$mean[2]-mean_RT$mean[4])
+# extracting sd in the same order
+SD <- c(mean_RT$sd[1],
+        mean_RT$sd[3],
+        "",
+        mean_RT$sd[2],
+        mean_RT$sd[4],
+        "")
+# making a tibble out if the objects containing the new order
+table_4 <- tibble(Distractor_Type = condition,
+       M = M,
+       SD = SD)
+
+table_4
+# The mean rt for each condition if not the same as reported in the paper, for the Categorically related and unrelated mean rt, the differences are only minor (0.15 and 0.25 ms), for the mediated phonological-semantical related and unrelated distractor types, the differences are a bigger (1.14 and 1.2 ms).
+# The results reported for the sd cannot be reproduced at all. Differences between their and our results are around 50ms for all 4 categories.
+           
+
+```
+
+## LME analysis
+
+the original data only has a colum "condition" with all for combinations across distractor type and distractor relatedness. In their paper, however, the researchers report to have two fixed effects: distractor type and distractor relatedness Therefore, the data frame needs to be adjusted for the model to be able to know what to do
+
+```{r}
+# changing data frame
+data_adjusted <- data_trimmed |>
+  mutate(distractor type)
+
+# preparing the data for sum-coding
+
+
+
+contrasts(data_trimmed$condition) <- 
+
+```
+
+## notes about their analysis:
