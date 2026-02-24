@@ -1,0 +1,30 @@
+---
+title: "tangerine_part2"
+format: html
+editor: visual
+---
+
+## Reproducibility assessment
+
+## 1- Analytical reproduction assessment
+
+```{r}
+dsfgdsg
+
+
+```
+
+You can add options to executable code like this
+
+```{r}
+#| echo: false
+
+
+
+```
+
+## 2- Computational reproduction assessment
+
+The `echo: false` option disables the printing of code (only output is displayed).
+
+## 3- Computational reproduction assessment
