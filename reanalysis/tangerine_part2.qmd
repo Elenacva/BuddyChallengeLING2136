@@ -6,25 +6,238 @@ editor: visual
 
 ## Reproducibility assessment
 
-## 1- Analytical reproduction assessment
+# Introduction: quick summary of the paper
 
-```{r}
-We tried to 
+```         
+We tried to reproduce the analysis in Mascelloni et al.(2021) where they look into mediated phonological-semantic priming in spoken word production. Their paper aims to empirically explore the suggested lemma retrieval models. Three models have been suggested in the literature: serial (the person first gets the lemma and then the phonological form of the word), cascade (lemma and phonological form are activated at the same time) and interactive (same as cascade but with feedback loop and interactions). In order to test this, the paper uses a picture–word interference paradigm. They aim to test whether a mediated phonological semantic interference appears. An example of this would be activation of fog by priming cat (cat -> dog -> fog) Participants are shown pictures which they have to name and naming latencies are recorded in ms. Before presenting the picture, participants get exposed to a related or unrelated word (spoken in Experiment 1, written in Experiment 2).
 
+They analyze their data with a linear mixed effects model (the maximal one does not converge, so they reduce it). Their results of Experiment 1 give support for the cascaded model of lexical retrieval because they show an effect of mediated phonological-semantic priming, which could not happen with a serial model of lexical retrieval. Experiment 2 shows a semantic interference effects, but not of a mediated semantic effect.
 
+For our reproducibility assessment, we are going to look at Experiment 1. 
+
+Codebook:
+participant: Participant number
+pic: What picture was used that the participant had to name
+sound: The distractor that the participant heard before the pic was presented 
+condition: The combinations of distractor type and distractor relatedness (4 levels)
+run: We have no idea what they mean by this and the authors never specify it either 
+rt: Reaction time in ms
+accuracy: Whether the participant named the picture correctly or not (0=wrong; 1= correct)
+SOA: Time between when the auditory stimulus is presented and when the picture is shown (in ms)
+type: We add this column later which differentiates between distractor type being either categorical or mediated phonological-semantic
+relatedness: We add this column later, either the distractor is related or unrelated, in terms of the category, to the presented picture (e.g cat-dog; cat-coffee; cat-fog, etc)
 ```
 
-You can add options to executable code like this
+## 1- Analytical reproduction
 
 ```{r}
 #| echo: false
 
+## Thank you Timo for this code that helps reproducibility
+# just run this code chunk
+# function to ignoring the setting of the relative path below when knitting
+run_if_not_knitting <- function(expr) {
+  if (!isTRUE(getOption("knitr.in.progress"))) {
+    eval(expr)
+  }
+}
 
+# nifty code using the pacman package
+# it checks if the packages specified below are installed, if not, they will be installed, if yes, they will be loaded
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(rstudioapi, tidyverse, lme4, trimr)
+
+#If needed, here below is the possible way to set the working directory to where 
+#this file is stored
+
+#Setting working directory 
+current_working_dir <- dirname(rstudioapi::getActiveDocumentContext()$path)
+setwd(current_working_dir)
 
 ```
 
+## Experiment 1
+
+### Preparation
+
+downloading data_written from their osf repository: https://osf.io/65f7w/overview and storing in the same folder as this quarto document
+
+```{r preparing data}
+# loading the data file
+aud_data_raw <- read_csv("data_auditory.csv")
+
+# filtering data following their description in paper
+aud_data_filtered <- aud_data_raw|>
+  # excluding speech errors
+  filter(accuracy == 1) |>
+  # excluding empty audio files
+  filter(rt > 0)
+
+# checking how many trials got excluded
+count(aud_data_raw)-count(aud_data_filtered)
+# We excluded 67 trials just as they said in the paper
+
+# continuing filtering the data with the "trimr" package
+aud_data_trimmed <- aud_data_filtered |>
+  # excluding RT below 250ms
+  sdTrim(minRT = 250,
+         # excluding RT above mean+3*sd per participant
+         sd = 3,
+         perCondition = FALSE,
+         perParticipant = TRUE,
+         returnType = "raw")
+# in paper they say that the excluced -3sd too,
+# but that cannot be done with the sdTrim function
+
+# checking how much data we excluded:
+count(aud_data_filtered)-count(aud_data_trimmed)
+# while we only excluded 48 trials, the paper reports that 57 trials where removed 
+
+# renaming data to make it easier
+data_ex1 <- aud_data_trimmed
+
+```
+
+## Reproducing Table 3
+
+```{r}
+# mean RT for each condition
+
+mean_RT <- data_ex1 |>
+  # grouping by condition
+  group_by(condition)|>
+  # calculating mean of reaction time and rounding on 2 digits
+  summarize(mean = round(mean(rt),2),
+            sd = round(sd(rt),2))
+  
+  
+  
+# making a df that displays data just like table 3 in their paper
+# reordering the conditions
+condition <- c("Categorically related",
+               "Unrelated",
+               "Semantic inference",
+               "Mediated phonological-semantical",
+               "Unrelated",
+               "Semantic inference")
+# extracting mean rt in the same order
+M <- c(mean_RT$mean[1],
+          mean_RT$mean[3],
+          mean_RT$mean[1]-mean_RT$mean[3], 
+          mean_RT$mean[2],
+          mean_RT$mean[4],
+          mean_RT$mean[2]-mean_RT$mean[4])
+# extracting sd in the same order
+SD <- c(mean_RT$sd[1],
+        mean_RT$sd[3],
+        "",
+        mean_RT$sd[2],
+        mean_RT$sd[4],
+        "")
+# making a tibble out if the objects containing the new order
+table_3 <- tibble(Distractor_Type = condition,
+       M = M,
+       SD = SD)
+
+table_3
+# The mean rt for each condition if not the same as reported in the paper, for the Categorically related and unrelated mean rt, the differences are only minor (0.26 and 0.76 ms), for the mediated phonological-semantical related and unrelated distractor types, the differences are a bigger (1.33 and 0.77 ms).
+# The results reported for the sd cannot be reproduced at all. Differences between their and our results are around 70ms for all 4 categories.
+           
+
+```
+
+## LME analysis
+
+the original data only has a column "condition" with all for combinations across distractor type and distractor relatedness. In their paper, however, the researchers report to have two fixed effects: distractor type and distractor relatedness Therefore, the data frame needs to be adjusted for the model to be able to know what to do
+
+```{r}
+# changing data frame
+data_adjusted_1 <- data_ex1 |>
+  # creating a column for distractor type
+  mutate(type = case_when(condition == "category" ~ "Categorical",
+                                     condition == "unrelated_cat" ~ "Categorical",
+                                     condition == "mediated" ~ "Mediated",
+                                     condition == "unrelated_med" ~ "Mediated"),
+         # creating a column for distractor relatedness
+         relatedness = case_when(condition == "category" ~ "related",
+                                 condition == "mediated" ~ "related",
+                                 condition == "unrelated_cat" ~ "unrelated",
+                                 condition == "unrelated_med" ~ "unrelated"))|>
+  # coding new columns as factors
+  mutate(type = as.factor(type),
+         relatedness = as.factor(relatedness))
+# looking at new data frame
+data_adjusted_1
+# double checking levels
+levels(data_adjusted_1$type)
+levels(data_adjusted_1$relatedness)
+# changing contrasts for sum-coding
+contrasts(data_adjusted_1$type) <- c(-0.5, 0.5)
+contrasts(data_adjusted_1$relatedness) <- c(0.5, -0.5)
+
+# fitting a mixed effects linear model
+ex1_mdl_max <- lmer(rt ~ type * relatedness +
+                      (1+type|participant)+(1+type|pic),
+                    data = data_adjusted_1,
+                    control = lmerControl(optimizer = "bobyqa"))
+# I only get the warning message "boundary (singular) fit: see help('isSingular')" - not really that it didn't converge
+
+# removing correlation between random slopes and intercepts
+ex1_mdl_less <- lmer(rt ~ type * relatedness +
+                       (1+type||participant)+(1+type||pic),
+                    data = data_adjusted_1,
+                    control = lmerControl(optimizer = "bobyqa"))
+# same warning message
+
+#### need to check varience of each random effect slope! How?
+
+# fitting the final model
+ex1_mdl_final <- lmer(rt ~ type * relatedness +
+                       (1+relatedness||participant)+(1|pic),
+                    data = data_adjusted_1,
+                    control = lmerControl(optimizer = "bobyqa"))
+# I still get the same error message!?
+
+# checking residuals visually
+res1 <- residuals(ex1_mdl_final)
+# creating matrix
+par(mfrow = c(1,3))
+# Plot 1, histogram
+hist(res1)
+# Plot 2, Q-Q plot
+qqnorm(res1)
+qqline(res1)
+# Plot 3, residual plot
+plot(fitted(ex1_mdl_final), res1)
+
+# while they report, that the residuals did not violate normality assumptions, the visual assessment in this reanalysis shows a clear pattern in all three plots that indicated that the underlying data does not come from a normal distribution. The histogram is skewed, the line is clearly not straight and the dots in the third plot are not equally spread, but clustered in the lower left part of the plot.
+
+```
+
+## Our assessment based on the analytical reproduction:
+
+In the paper, they say they are using the trmr package, but not specify which function. We wonder why they say upper AND lower 3\*sd, when the function has only upper bound. We cannot really tell from their write up in the paper.
+
+There is a discrepancy regarding how many trials are filtered out: they report 57 in the paper, in our attempt only 48 are removed using the trmr package. Even doing it manually, it still only removed 48. Potentially related to this, Table 3 does not have the same values in our reproduction attempt. The values for the mean are only slightly off, however the SD they provide and the one we get is around 70ms difference.
+
+It is unclear from their write up how they exactly fitted their models, both for the original and reduced model. They only mention "distractors" but not specify if is distractor type or relatedness or both.
+
+They report that their final reduced model converges, but when we attempted to run it based on what they report (which was more detailed than what they report for the other models), we get "isSingular". This discrepancy may be due to the fact that their write up of their model is vague, ambiguous and does not take reader cognitive effort into account.
+
+They also report that visual inspection of the residuals follow normality, which we do not agree with. Our residuals definitely do not follow normality.
+
 ## 2- Computational reproduction assessment
 
-The `echo: false` option disables the printing of code (only output is displayed).
+We ran through the code that the authors share in the OSF repository. The only big issue when doing that was related to the working directory command. If you accidentally run it twice, it will through and error and will not run the rest of the code.
 
-## 3- Computational reproduction assessment
+Something that we noticed was that their code also just removed 48 trials from Experiment 1 in the second filtering even though they claimed 57 in their paper.
+
+Another problematic thing we noticed was that they never provide any code that would give us the descriptive statistics that they report in the paper in Tables 3 and 4.
+
+They use incredibly complicated (unnecessarily) functions in their code. They also write often in very long lines that make following their code quite convoluted.
+
+They did not have a codebook in their code, which made things more difficult for us. Also, their comments on the code do not hand hold the reader, which makes following things difficult.
+
+## 3- Final commentary
+
+As previously mentioned at the end of section 1, our attempted analysis and the authors' analysis do not match completely. It is hard to know whether this is due to differences in outlier removal and data wrangling that result in different numbers. They seem to be doing different things in their code to what they are reporting in their paper. Because of this, we feel in no position to either agree or disagree with their claim. We could clearly not reproduce it and remain agnostic for the time being. However, these discrepancies did affect our trust in their results and claims.

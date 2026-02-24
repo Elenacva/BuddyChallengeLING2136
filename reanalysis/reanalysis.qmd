@@ -125,7 +125,7 @@ table_3
 
 ## LME analysis
 
-the original data only has a colum "condition" with all for combinations across distractor type and distractor relatedness. In their paper, however, the researchers report to have two fixed effects: distractor type and distractor relatedness Therefore, the data frame needs to be adjusted for the model to be able to know what to do
+the original data only has a column "condition" with all for combinations across distractor type and distractor relatedness. In their paper, however, the researchers report to have two fixed effects: distractor type and distractor relatedness Therefore, the data frame needs to be adjusted for the model to be able to know what to do
 
 ```{r}
 # changing data frame
@@ -192,6 +192,8 @@ plot(fitted(ex1_mdl_final), res1)
 ```
 
 ## notes about their analysis:
+
+didnt say what trimr function, why do they say upper AND lower 3\*sd, but function has only upper bound
 
 # Experiment 2
 
@@ -286,7 +288,7 @@ table_4
 
 ## LME analysis
 
-the original data only has a colum "condition" with all for combinations across distractor type and distractor relatedness. In their paper, however, the researchers report to have two fixed effects: distractor type and distractor relatedness Therefore, the data frame needs to be adjusted for the model to be able to know what to do
+the original data only has a column "condition" with all for combinations across distractor type and distractor relatedness. In their paper, however, the researchers report to have two fixed effects: distractor type and distractor relatedness Therefore, the data frame needs to be adjusted for the model to be able to know what to do
 
 ```{r}
 # changing data frame
@@ -327,7 +329,7 @@ ex2_mdl_less <- lmer(rt ~ type * relatedness +
                     control = lmerControl(optimizer = "bobyqa"))
 # same warning message
 
-#### need to check varience of each random effect slope! How?
+#### need to check varaience of each random effect slope! How?
 
 # fitting the final model
 ex2_mdl_final <- lmer(rt ~ type * relatedness +
