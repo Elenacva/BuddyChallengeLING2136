@@ -1,0 +1,58 @@
+---
+title: "Tangerine_part4"
+author: "Tangerine"
+format: html
+editor: visual
+---
+
+# Buddy challenge part 4: Bayesian models
+
+DELETE
+
+# Task: delete this later
+
+This is **Part 4** of the buddy challenge: Run a series of Bayesian models equivalent to the critical model in the original article that originally did not converge:
+
+-   \(a\) run the **closest equivalent of their analysis** (i.e. same structure but using flat priors)
+
+-   \(b\) run a **proper model with proper, weakly informative priors** and justify your prior choices;
+
+-   interpret the results relative to the research question by interpreting the posteriors relative to zero;
+
+-   write up the results and write a report on the comparison between your reanalysis and their original analysis. Write **at least 500 words** in which you describe your analysis including your prior choices and compare the results between your analysis and the original analysis both quantitatively and qualitatively (do the analyses arrive at the same conclusions?). 
+
+-   add the report to your GitHub Repo from Part 3.
+
+Each buddy group leader additionally submits their report as a **markdown (.qmd) and knitted pdf file here.**
+
+Naming convention for files: groupname_part4
+
+END OF THE PART THAT NEEDS TO BE DELETED
+
+## Bayesian model closest to Mascelloni et al. (2021)
+
+```{Closest equivalent of Mascelloni et al}
+
+
+
+
+
+```
+
+## Bayesian model with weakly informative priors
+
+```{Proper model with weakly informative priors}
+
+
+
+
+
+```
+
+## Interpreting the results
+
+-   interpret the results relative to the research question by interpreting the posteriors relative to zero
+
+## Report comparing our reanalysis and the original analysis
+
+-   write up the results and write a report on the comparison between your reanalysis and their original analysis. Write **at least 500 words** in which you describe your analysis including your prior choices and compare the results between your analysis and the original analysis both quantitatively and qualitatively (do the analyses arrive at the same conclusions?)
