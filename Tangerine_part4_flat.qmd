@@ -228,7 +228,21 @@ proper_model <- brm(
   cores = 4        
 )
 
+# checking convergence diagnostics
+mcmc_plot(proper_model,
+          type = 'trace') 
+# looks like healthy caterpillars
+mcmc_dens_overlay(proper_model,
+                  pars = "b_distractor_type1")
+mcmc_dens_overlay(proper_model,
+                  pars = "b_distractor_relatedness1")
+mcmc_dens_overlay(proper_model,
+                  pars = "b_distractor_type1:distractor_relatedness1")
+# Overlay for the fixed effects estimates look good too
 
+# looking at model output
+proper_model
+# Rhat and ESS values are fine 
 
 ```
 
@@ -238,13 +252,6 @@ proper_model <- brm(
 #| label: interpret_sim
 
 summary(proper_model)
-
-# The estimate (so average reaction time across all condition combinations)
-# is 754 ms with the 95% credible intervals ranging 707-801 ms. 
-# For distractor type categorical, the average reaction time is 749 ms,
-# with credible intervals ranging 
-# while for distractor type mediated, the average reaction time is 759 ms.
-# For distractor type related, the average rt is 
 
 proper_model |> 
   gather_draws(b_distractor_relatedness1, b_distractor_type1, `b_distractor_type1:distractor_relatedness1`) |> 
@@ -264,7 +271,7 @@ p_direction(proper_model)
 
 ```
 
--   interpret the results relative to the research question by interpreting the posteriors relative to zero
+Average reaction time across all condition combinations is 754 ms with the 95% credible intervals ranging 707-801 ms. When it comes to distractor types, the difference between categorical and mediated distractors, is likely (pd= 86.70%) to be positive, 10.45 ms, CI = \[-7.97, 28.30\], however both no difference and effect going the opposite direction are possible, too. For distractor relatedness, the difference between unrelated and related is 20.31 ms, CI \[10.23, 30.29\]. Pd of direction is 100% meaning that the effect is always expected to be positive and zero is impossible given our data, priors and model. The interaction between distractor type and relatedness shows a difference of -7.44ms with a CI of \[-26.40, 11.45\]. Pd of direction is 77.85% negative, looking at the plot, we see that zero, thus no interaction, is still likely as it is within the 50% interval.
 
 ## Report comparing our reanalysis and the original analysis
 
