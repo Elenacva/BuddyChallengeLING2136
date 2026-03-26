@@ -1,0 +1,298 @@
+---
+title: "Tangerine_part4"
+author: "Tangerine"
+format: html
+editor: visual
+---
+
+# Buddy challenge part 4: Bayesian models
+
+DELETE
+
+# Task: delete this later
+
+This is **Part 4** of the buddy challenge: Run a series of Bayesian models equivalent to the critical model in the original article that originally did not converge:
+
+-   \(a\) run the **closest equivalent of their analysis** (i.e. same structure but using flat priors)
+
+-   \(b\) run a **proper model with proper, weakly informative priors** and justify your prior choices;
+
+-   interpret the results relative to the research question by interpreting the posteriors relative to zero;
+
+-   write up the results and write a report on the comparison between your reanalysis and their original analysis. Write **at least 500 words** in which you describe your analysis including your prior choices and compare the results between your analysis and the original analysis both quantitatively and qualitatively (do the analyses arrive at the same conclusions?). 
+
+-   add the report to your GitHub Repo from Part 3.
+
+Each buddy group leader additionally submits their report as a **markdown (.qmd) and knitted pdf file here.**
+
+Naming convention for files: groupname_part4
+
+END OF THE PART THAT NEEDS TO BE DELETED
+
+## Seting up working directory, packages and data
+
+```{r, packages and workind directory}
+
+# just run this code chunk
+# function to ignoring the setting of the relative path below when knitting
+run_if_not_knitting <- function(expr) {
+  if (!isTRUE(getOption("knitr.in.progress"))) {
+    eval(expr)
+  }
+}
+
+# nifty code using the pacman package
+# it checks if the packages specified below are installed, if not, 
+#they will be installed, if yes, they will be loaded
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(rstudioapi, tidyverse, bayesrules,
+               tidybayes, trimr, brms, bayesplot, bayestestR, modelr)
+
+# set the current working directory to the one where this file is
+run_if_not_knitting(current_working_dir <- dirname(rstudioapi::getActiveDocumentContext()$path))
+run_if_not_knitting(setwd(current_working_dir))
+
+# options to increase efficiency of brms models (optional)
+#options(brms.backend = "cmdstanr")
+options(mc.cores = parallel::detectCores())
+
+
+```
+
+```{r, data loading}
+#| label: prep data for task 1
+#| echo: false 
+aud_raw <- read_csv("reanalysis/data_auditory.csv")
+
+aud  <-  aud_raw |>
+  # excluding speech errors
+  filter(accuracy == 1) |>
+  # excluding empty audio files
+  filter(rt > 0) |> 
+  # excluding RT below 250ms
+  sdTrim(minRT = 250,
+         # excluding RT above mean+3*sd per participant
+         sd = 3,
+         perCondition = FALSE,
+         perParticipant = TRUE,
+         returnType = "raw") |>
+  # Changing the name of the column "sound" 
+  # to match the original naming in Mascelloni et al
+  mutate(distractor_word = sound) |>
+  # removing the column named sound
+  select(-sound) |>
+  # creating categories needed for the model
+  mutate(distractor_type = case_when(condition == "category" ~ "Categorical",
+                                     condition == "unrelated_cat" ~ "Categorical",
+                                     condition == "mediated" ~ "Mediated",
+                                     condition == "unrelated_med" ~ "Mediated"),
+         # creating a column for distractor relatedness
+         distractor_relatedness = case_when(condition == "category" ~ "related",
+                                 condition == "mediated" ~ "related",
+                                 condition == "unrelated_cat" ~ "unrelated",
+                                 condition == "unrelated_med" ~ "unrelated")) |>
+  # coding new columns as factors
+  mutate(distractor_type = as.factor(distractor_type),
+         distractor_relatedness = as.factor(distractor_relatedness)) |>
+  # removing unnecessary columns for aesthetics
+  select(-condition, -run, -SOA, -accuracy)
+
+# double checking levels
+levels(aud$distractor_type)
+levels(aud$distractor_relatedness)
+# changing contrasts for sum-coding
+contrasts(aud$distractor_type) <- c(-0.5, 0.5)
+contrasts(aud$distractor_relatedness) <- c(0.5, -0.5)
+
+```
+
+## Bayesian model closest to Mascelloni et al. (2021) with flat (ish) priors
+
+```{r, Closest equivalent of Mascelloni et al}
+
+# Copy pasting the Mascelloni et al maximal model that did NOT converge
+lmer.exp1 <- lmer(rt ~ distractor_type * distractor_relatedness + 
+                    (1 + distractor_type.num * distractor_relatedness.num | participant) + 
+                    (1 + distractor_type.num * distractor_relatedness.num | pic) + 
+                    (1 + distractor_relatedness.num | distractor_word), 
+                  data=exp1_trimmedData, 
+                  control=lmerControl(optimizer="bobyqa"), 
+                  verbose=2)
+
+# Getting our priors
+maximal <- bf(rt ~ distractor_type * distractor_relatedness + 
+                    (1 + distractor_type * distractor_relatedness | participant) + 
+                    (1 + distractor_type * distractor_relatedness | pic) + 
+                    (1 + distractor_relatedness | distractor_word))
+
+get_prior(maximal, aud, family = "gaussian")
+
+# Setting flat priors
+
+# We're aware we're not technically setting completely flat priors since, 
+# as McElreath points out, flat means all values are possible, but we need 
+# the computer to work and also negative rt values are absurd
+
+flat_priors <- c(prior(uniform(0, 1800), class = "Intercept"),
+                 #not putting anything for class b since the model will
+                 #automatically do flat if not told otherwise
+                 #we put a broad prior for the sd and sigma which is the closest
+                 #we manage to get to fully flat with our machines being able
+                 #to run this. We initially had way flatter but it kept "frying"
+                 #the computer we were using
+              prior(normal(0, 50), class = "sd"),
+              prior(normal(0, 50), class = "sigma"))
+
+
+flat_model_bayesian <- brm(
+  formula = maximal,
+  data = aud,
+  prior = flat_priors,
+  family = gaussian(),
+  chains = 4,
+  iter = 2000,
+  warmup = 1000, 
+  seed = 42,
+  thin = 1,
+  cores = 4        
+)
+# checking convergence diagnostics
+mcmc_plot(flat_model_bayesian,
+          type = 'trace') 
+# looks like healthy caterpillars
+mcmc_dens_overlay(flat_model_bayesian,
+                  pars = "b_distractor_type1")
+mcmc_dens_overlay(flat_model_bayesian,
+                  pars = "b_distractor_relatedness1")
+mcmc_dens_overlay(flat_model_bayesian,
+                  pars = "b_distractor_type1:distractor_relatedness1")
+# Overlay for the fixed effects estimates look good too
+
+# looking at model output
+flat_model_bayesian
+# Rhat and ESS values are fine 
+
+# probability of direction
+p_direction(flat_model_bayesian)
+
+# computing p-value out of pd of direction so we can compare it to the original paper (we are aware that we are not actually using flat priors and the values we get therefore cant actually be trusted for comparison)
+
+# p-value for b_distractor_type1
+pd_to_p(pd = 0.8688, direction = 'two-sided') 
+# p-value: 0.2624
+
+# p-value for b_distractor_relatedness1
+pd_to_p(pd = 0.9992, direction = 'two-sided')
+# p-value: 0.0016
+
+# p-value for b_distractor_type1:distractor_relatedness1
+pd_to_p(pd = 0.7502, direction = 'two-sided')
+# p-value: 0.4996
+
+
+# In the original analysis with the reduced model, they report p-values of 0.252 for distractor type, 0.001 for relatedness and 0.428 for the interaction term. These values are quite similar to what we got and we get the exact same "significance" which is only relatedness.
+
+```
+
+## Bayesian model with weakly informative priors
+
+```{r, Proper model with weakly informative priors}
+
+# We tested things with this plot and landed on the following numbers:
+# Reasoning was to keep things wide and "open"
+plot_normal(718, 220)
+
+# Setting weakly informative priors, taken from the normal ploting we just did
+#and from R's "get_priors"'s "advice"
+weak_priors <- c(prior(normal(718, 220), class = "Intercept"),
+                 prior(normal(0, 220), class = "b", coef = "distractor_relatedness1"),
+              prior(normal(0, 220), class = "b", coef = "distractor_type1"),
+              prior(normal(0, 220), class = "b", coef = "distractor_type1:distractor_relatedness1"),
+              prior(lkj(1), class = 'cor'),
+              prior(cauchy(0, 3), class = 'sd', group = 'distractor_word'),
+              prior(cauchy(0, 3), class = 'sd', group = 'participant'),
+              prior(cauchy(0, 3), class = 'sd', group = 'pic'),
+              prior(normal(0, 138), class = "sigma"))
+              
+
+proper_model <- brm(
+  formula = maximal,
+  data = aud,
+  prior = weak_priors,
+  family = gaussian(),
+  chains = 4,
+  iter = 2000,
+  warmup = 1000,
+  thin = 1, 
+  seed = 42,
+  cores = 4        
+)
+
+
+
+```
+
+## Interpreting the results
+
+```{r, interpreting}
+#| label: interpret_sim
+
+summary(proper_model)
+
+# The estimate (so average reaction time across all condition combinations)
+# is 754 ms with the 95% credible intervals ranging 707-801 ms. 
+# For distractor type categorical, the average reaction time is 749 ms,
+# with credible intervals ranging 
+# while for distractor type mediated, the average reaction time is 759 ms.
+# For distractor type related, the average rt is 
+
+library(emmeans)
+emmeans(aud, )
+
+spread_draws(proper_model, )
+
+gather_draws(model_sqrt, b_Phon1, b_Sem1,`b_Phon1:Sem1`) |>
+  ggplot(aes(x = .value)) +
+  geom_density(fill = "steelblue", alpha = 0.5) +
+  facet_wrap(~ .variable, scales = "free") +
+  labs(
+    x = "Posterior slope values",
+    y = "Density",
+    title = "Posterior distributions"
+  )
+
+
+
+
+model_sim |>
+  # Note: backticks around the interaction name
+  spread_draws(b_Phon1, b_Sem1, b_Phon1:Sem1) |>
+  # immediately rename the interaction to something syntactic
+  rename(b_Phon1_Sem1 = "b_Phon1:Sem1") |>
+  mutate(
+    # full marginal effects on the Distance scale
+    Phon_Diff   = 2 * b_Phon1,        # Different − Similar (Phon), averaged over Sem
+    Sem_Diff    = 2 * b_Sem1,         # Different − Similar (Sem), averaged over Phon
+    Interaction = 4 * b_Phon1_Sem1    # (SS − SD) − (DS − DD)
+  ) |>
+  select(Phon_Diff, Sem_Diff, Interaction) |>
+  pivot_longer(
+    cols      = everything(),
+    names_to  = "Effect",
+    values_to = "Difference"
+  ) |>
+  ggplot(aes(x = Difference, fill = Effect)) +
+  geom_density(alpha = 0.6) +
+  facet_wrap(~ Effect, scales = "free") +
+  labs(x = "Effect size (on Distance scale)", y = "Posterior density")
+
+
+p_direction(proper_model)
+
+```
+
+-   interpret the results relative to the research question by interpreting the posteriors relative to zero
+
+## Report comparing our reanalysis and the original analysis
+
+-   write up the results and write a report on the comparison between your reanalysis and their original analysis. Write **at least 500 words** in which you describe your analysis including your prior choices and compare the results between your analysis and the original analysis both quantitatively and qualitatively (do the analyses arrive at the same conclusions?)
