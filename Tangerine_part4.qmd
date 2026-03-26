@@ -31,7 +31,7 @@ END OF THE PART THAT NEEDS TO BE DELETED
 
 ## Seting up working directory, packages and data
 
-```{packages and workind directory}
+```{r, packages and workind directory}
 
 # just run this code chunk
 # function to ignoring the setting of the relative path below when knitting
@@ -59,7 +59,7 @@ options(mc.cores = parallel::detectCores())
 
 ```
 
-```{data loading}
+```{r, data loading}
 #| label: prep data for task 1
 #| echo: false 
 aud_raw <- read_csv("reanalysis/data_auditory.csv")
@@ -106,10 +106,9 @@ contrasts(aud$distractor_relatedness) <- c(0.5, -0.5)
 
 ```
 
+## Bayesian model closest to Mascelloni et al. (2021) with flat (ish) priors
 
-## Bayesian model closest to Mascelloni et al. (2021)
-
-```{Closest equivalent of Mascelloni et al}
+```{r, Closest equivalent of Mascelloni et al}
 
 # Copy pasting the Mascelloni et al maximal model that did NOT converge
 lmer.exp1 <- lmer(rt ~ distractor_type * distractor_relatedness + 
@@ -134,41 +133,41 @@ get_prior(maximal, aud, family = "gaussian")
 # as McElreath points out, flat means all values are possible, but we need 
 # the computer to work and also negative rt values are absurd
 
-flat_priors <- c(prior(uniform(0, 1000), class = "Intercept"),
+flat_priors <- c(prior(uniform(0, 800), class = "Intercept"),
                  #not putting anything for class b since the model will
                  #automatically do flat if not told otherwise
-              prior(uniform(0, 1000), class = "sd"),
-              prior(uniform(0, 1000), class = "sigma"))
+                 #we put a broad prior for the sd and sigma which is the closest
+                 #we manage to get to fully flat with our machines being able
+                 #to run this. We initially had way flatter but it kept "frying"
+                 #the computer we were using
+              prior(normal(0, 50), class = "sd"),
+              prior(normal(0, 50), class = "sigma"))
 
-#We initially had flatter things with infinity and larger numbers, but it
-# kept frying the computer
 
-max_model_bayesian <- brm(
+flat_model_bayesian <- brm(
   formula = maximal,
   data = aud,
   prior = flat_priors,
   family = gaussian(),
   chains = 4,
-  iter = 2000, # Total steps per chain; more steps lead to more precise estimates, I believe i have tried 2000 with warmup 1000  first but didn't work so i raise the number up, i may be wrong :>, we can test it again with 2000 
+  iter = 2000,
   warmup = 1000, 
   seed = 42,
-  thin = 1 # I added this now (18:50)
+  thin = 1,
   cores = 4        
 )
-
-
-
 ```
 
 ## Bayesian model with weakly informative priors
 
-```{Proper model with weakly informative priors}
+```{r, Proper model with weakly informative priors}
 
 # We tested things with this plot and landed on the following numbers:
 # Reasoning was to keep things wide and "open"
 plot_normal(718, 220)
 
-# Setting weakly informative priors
+# Setting weakly informative priors, taken from the normal ploting we just did
+#and from R's "get_priors"'s "advice"
 weak_priors <- c(prior(normal(718, 220), class = "Intercept"),
                  prior(normal(0, 220), class = "b", coef = "distractor_relatedness1"),
               prior(normal(0, 220), class = "b", coef = "distractor_type1"),
@@ -180,7 +179,7 @@ weak_priors <- c(prior(normal(718, 220), class = "Intercept"),
               prior(normal(0, 138), class = "sigma"))
               
 
-max_model_bayesian <- brm(
+proper_model <- brm(
   formula = maximal,
   data = aud,
   prior = weak_priors,
@@ -188,7 +187,7 @@ max_model_bayesian <- brm(
   chains = 4,
   iter = 2000,
   warmup = 1000,
-  thin = 1 # I added this now (18:50)
+  thin = 1, 
   seed = 42,
   cores = 4        
 )
@@ -199,10 +198,10 @@ max_model_bayesian <- brm(
 
 ## Interpreting the results
 
-```{r}
+```{r, interpreting}
 #| label: interpret_sim
 
-summary(max_model_bayesian)
+summary(proper_model)
 
 # The estimate (so average reaction time across all condition combinations)
 # is 754 ms with the 95% credible intervals ranging 707-801 ms. 
@@ -212,7 +211,22 @@ summary(max_model_bayesian)
 # For distractor type related, the average rt is 
 
 library(emmeans)
-emmeans(maximal, ~ Phon * Sem)
+emmeans(aud, )
+
+spread_draws(proper_model, )
+
+gather_draws(model_sqrt, b_Phon1, b_Sem1,`b_Phon1:Sem1`) |>
+  ggplot(aes(x = .value)) +
+  geom_density(fill = "steelblue", alpha = 0.5) +
+  facet_wrap(~ .variable, scales = "free") +
+  labs(
+    x = "Posterior slope values",
+    y = "Density",
+    title = "Posterior distributions"
+  )
+
+
+
 
 model_sim |>
   # Note: backticks around the interaction name
@@ -237,7 +251,7 @@ model_sim |>
   labs(x = "Effect size (on Distance scale)", y = "Posterior density")
 
 
-
+p_direction(proper_model)
 
 ```
 
