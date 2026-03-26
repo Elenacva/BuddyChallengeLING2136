@@ -7,28 +7,6 @@ editor: visual
 
 # Buddy challenge part 4: Bayesian models
 
-DELETE
-
-# Task: delete this later
-
-This is **Part 4** of the buddy challenge: Run a series of Bayesian models equivalent to the critical model in the original article that originally did not converge:
-
--   \(a\) run the **closest equivalent of their analysis** (i.e. same structure but using flat priors)
-
--   \(b\) run a **proper model with proper, weakly informative priors** and justify your prior choices;
-
--   interpret the results relative to the research question by interpreting the posteriors relative to zero;
-
--   write up the results and write a report on the comparison between your reanalysis and their original analysis. Write **at least 500 words** in which you describe your analysis including your prior choices and compare the results between your analysis and the original analysis both quantitatively and qualitatively (do the analyses arrive at the same conclusions?). 
-
--   add the report to your GitHub Repo from Part 3.
-
-Each buddy group leader additionally submits their report as a **markdown (.qmd) and knitted pdf file here.**
-
-Naming convention for files: groupname_part4
-
-END OF THE PART THAT NEEDS TO BE DELETED
-
 ## Seting up working directory, packages and data
 
 ```{r, packages and workind directory}
@@ -133,7 +111,7 @@ get_prior(maximal, aud, family = "gaussian")
 # as McElreath points out, flat means all values are possible, but we need 
 # the computer to work and also negative rt values are absurd
 
-flat_priors <- c(prior(uniform(0, 800), class = "Intercept"),
+flat_priors <- c(prior(uniform(0, 1800), class = "Intercept"),
                  #not putting anything for class b since the model will
                  #automatically do flat if not told otherwise
                  #we put a broad prior for the sd and sigma which is the closest
@@ -156,6 +134,42 @@ flat_model_bayesian <- brm(
   thin = 1,
   cores = 4        
 )
+# checking convergence diagnostics
+mcmc_plot(flat_model_bayesian,
+          type = 'trace') 
+# looks like healthy caterpillars
+mcmc_dens_overlay(flat_model_bayesian,
+                  pars = "b_distractor_type1")
+mcmc_dens_overlay(flat_model_bayesian,
+                  pars = "b_distractor_relatedness1")
+mcmc_dens_overlay(flat_model_bayesian,
+                  pars = "b_distractor_type1:distractor_relatedness1")
+# Overlay for the fixed effects estimates look good too
+
+# looking at model output
+flat_model_bayesian
+# Rhat and ESS values are fine 
+
+# probability of direction
+p_direction(flat_model_bayesian)
+
+# computing p-value out of pd of direction so we can compare it to the original paper (we are aware that we are not actually using flat priors and the values we get therefore cant actually be trusted for comparison)
+
+# p-value for b_distractor_type1
+pd_to_p(pd = 0.8688, direction = 'two-sided') 
+# p-value: 0.2624
+
+# p-value for b_distractor_relatedness1
+pd_to_p(pd = 0.9992, direction = 'two-sided')
+# p-value: 0.0016
+
+# p-value for b_distractor_type1:distractor_relatedness1
+pd_to_p(pd = 0.7502, direction = 'two-sided')
+# p-value: 0.4996
+
+
+# In the original analysis with the reduced model, they report p-values of 0.252 for distractor type, 0.001 for relatedness and 0.428 for the interaction term. These values are quite similar to what we got and we get the exact same "significance" which is only relatedness.
+
 ```
 
 ## Bayesian model with weakly informative priors
@@ -192,7 +206,21 @@ proper_model <- brm(
   cores = 4        
 )
 
+# checking convergence diagnostics
+mcmc_plot(proper_model,
+          type = 'trace') 
+# looks like healthy caterpillars
+mcmc_dens_overlay(proper_model,
+                  pars = "b_distractor_type1")
+mcmc_dens_overlay(proper_model,
+                  pars = "b_distractor_relatedness1")
+mcmc_dens_overlay(proper_model,
+                  pars = "b_distractor_type1:distractor_relatedness1")
+# Overlay for the fixed effects estimates look good too
 
+# looking at model output
+proper_model
+# Rhat and ESS values are fine 
 
 ```
 
@@ -203,60 +231,34 @@ proper_model <- brm(
 
 summary(proper_model)
 
-# The estimate (so average reaction time across all condition combinations)
-# is 754 ms with the 95% credible intervals ranging 707-801 ms. 
-# For distractor type categorical, the average reaction time is 749 ms,
-# with credible intervals ranging 
-# while for distractor type mediated, the average reaction time is 759 ms.
-# For distractor type related, the average rt is 
-
-library(emmeans)
-emmeans(aud, )
-
-spread_draws(proper_model, )
-
-gather_draws(model_sqrt, b_Phon1, b_Sem1,`b_Phon1:Sem1`) |>
-  ggplot(aes(x = .value)) +
-  geom_density(fill = "steelblue", alpha = 0.5) +
-  facet_wrap(~ .variable, scales = "free") +
-  labs(
-    x = "Posterior slope values",
-    y = "Density",
-    title = "Posterior distributions"
-  )
-
-
-
-
-model_sim |>
-  # Note: backticks around the interaction name
-  spread_draws(b_Phon1, b_Sem1, b_Phon1:Sem1) |>
-  # immediately rename the interaction to something syntactic
-  rename(b_Phon1_Sem1 = "b_Phon1:Sem1") |>
-  mutate(
-    # full marginal effects on the Distance scale
-    Phon_Diff   = 2 * b_Phon1,        # Different − Similar (Phon), averaged over Sem
-    Sem_Diff    = 2 * b_Sem1,         # Different − Similar (Sem), averaged over Phon
-    Interaction = 4 * b_Phon1_Sem1    # (SS − SD) − (DS − DD)
-  ) |>
-  select(Phon_Diff, Sem_Diff, Interaction) |>
-  pivot_longer(
-    cols      = everything(),
-    names_to  = "Effect",
-    values_to = "Difference"
-  ) |>
-  ggplot(aes(x = Difference, fill = Effect)) +
-  geom_density(alpha = 0.6) +
-  facet_wrap(~ Effect, scales = "free") +
-  labs(x = "Effect size (on Distance scale)", y = "Posterior density")
+proper_model |> 
+  gather_draws(b_distractor_relatedness1, b_distractor_type1, `b_distractor_type1:distractor_relatedness1`) |> 
+  # plot
+  ggplot(aes(x = .value,
+             y = .variable)) +
+    stat_halfeye() +
+    geom_vline(xintercept = 0,
+               lty = "dashed") +
+  labs(x = "posterior estimate for reaction times",
+       y = "") +
+  theme_minimal()
 
 
 p_direction(proper_model)
 
-```
 
--   interpret the results relative to the research question by interpreting the posteriors relative to zero
+```
 
 ## Report comparing our reanalysis and the original analysis
 
--   write up the results and write a report on the comparison between your reanalysis and their original analysis. Write **at least 500 words** in which you describe your analysis including your prior choices and compare the results between your analysis and the original analysis both quantitatively and qualitatively (do the analyses arrive at the same conclusions?)
+In our final proper model, we kept the general build of the model of the original Mascelloni et al.(2021) paper. However, they did a frequentist model and we used a Bayesian one. We used weakly informative priors which we based on the general spread of the data (it covered nicely the range that we observed in the dataframe). For our slope prior, we had an agnostic prior of 0 difference between conditions.
+
+We got very similar coefficient values to the original paper, which increased our confidence in the original results. The specific coefficients (with their respective credible intervals) are provided below.
+
+Average reaction time across all condition combinations is 754 ms with the 95% credible intervals ranging 707-801 ms. When it comes to distractor types, the difference between categorical and mediated distractors, is likely (pd= 86.70%) to be positive, 10.45 ms, CI = \[-7.97, 28.30\], however both no difference and effect going the opposite direction are possible, too. For distractor relatedness, the difference between unrelated and related is 20.31 ms, CI \[10.23, 30.29\]. Pd of direction is 100% meaning that the effect is always expected to be positive and zero is impossible given our data, priors and model. The interaction between distractor type and relatedness shows a difference of -7.44ms with a CI of \[-26.40, 11.45\]. Pd of direction is 77.85% negative, looking at the plot, we see that zero, thus no interaction, is still likely as it is within the 50% interval.
+
+In addition, the coefficients we got from the (relatively) flat model were also almost identical to both our final model and the Mascelloni et al., (2021) linear mixed effects model. However, we as Bayesians do not look at a p-value and make a yes/no significance decision, which is something the frequentist analysist does. But for the sake of comparison, we still computed p-values out of the probability of direction we got from the flat model, and obtained extremely similar values.
+
+In the original paper, Mascelloni et al., (2021) claim that there is evidence for a mediated phonological-semantic effect. Reading their paper, there is no clear explanation for this claim or we were unable to understand it from their writing. Out of context, we managed to gauge that the effect that would support the cascade lexical retrival model would be for mediated related words to take longer reaction times in ms than mediated unrelated words (we do not touch SESOIs in this assignment yet). The reaction time for mediated related words is predicted by the model to be likely to be 767.62 ms whereas the mediated unrelated words 751.03 ms. This shows a result that favors the cascade model of lexical retrieval, which is what the original paper claimed. In addition, we see a promising interaction which the authors were expecting: The difference in reaction times between unrelated categorical distractors and related categorical distractors is 24.03 ms. The difference in reaction times between unrelated mediated distractors and related mediated distractors is also 16.59 ms.
+
+We believe that our results show some evidence of the distractor relatedness making a difference in how fast (or slow) the participant was in naming a picture. All in all, we agree with the original authors.
