@@ -1,0 +1,186 @@
+---
+title: "Tang_part5"
+author: "Tangerine"
+format: html
+editor: visual
+---
+
+# Buddy challenge part 5: SESOI, Bayes Factor and ROPEs
+
+TASK, DELETE LATER:
+
+Define the smallest effect size of interest for the original research question and do a literature research to justify your choice. 
+
+rerun your hypothesis test combining the concepts of Bayes Factor (BF) and Regions of Practical Equivalence (ROPE) (according to Roettger & Franke's method, 2025)
+
+run a sensitivity analyses for different ROPES and priors;
+write up the results accordingly.
+save the analysis and report in your Github repository
+Each buddy group leader additionally submits their report as a markdown (.qmd) and knitted pdf file here. 
+
+Naming convention for files: groupname_part5
+
+END OF DELETE LATER
+
+## Seting up working directory, packages and data
+
+```{r, packages and workind directory}
+
+# just run this code chunk
+# function to ignoring the setting of the relative path below when knitting
+run_if_not_knitting <- function(expr) {
+  if (!isTRUE(getOption("knitr.in.progress"))) {
+    eval(expr)
+  }
+}
+
+# nifty code using the pacman package
+# it checks if the packages specified below are installed, if not, 
+#they will be installed, if yes, they will be loaded
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(rstudioapi, tidyverse, bayesrules,
+               tidybayes, trimr, brms, bayesplot, bayestestR, modelr)
+
+# set the current working directory to the one where this file is
+run_if_not_knitting(current_working_dir <- dirname(rstudioapi::getActiveDocumentContext()$path))
+run_if_not_knitting(setwd(current_working_dir))
+
+# options to increase efficiency of brms models (optional)
+#options(brms.backend = "cmdstanr")
+options(mc.cores = parallel::detectCores())
+
+
+```
+
+```{r, data loading}
+#| label: prep data for task 1
+#| echo: false 
+
+# This code is the same as for part 4 since the wrangling is the same
+aud_raw <- read_csv("reanalysis/data_auditory.csv")
+
+aud  <-  aud_raw |>
+  # excluding speech errors
+  filter(accuracy == 1) |>
+  # excluding empty audio files
+  filter(rt > 0) |> 
+  # excluding RT below 250ms
+  sdTrim(minRT = 250,
+         # excluding RT above mean+3*sd per participant
+         sd = 3,
+         perCondition = FALSE,
+         perParticipant = TRUE,
+         returnType = "raw") |>
+  # Changing the name of the column "sound" 
+  # to match the original naming in Mascelloni et al
+  mutate(distractor_word = sound) |>
+  # removing the column named sound
+  select(-sound) |>
+  # creating categories needed for the model
+  mutate(distractor_type = case_when(condition == "category" ~ "Categorical",
+                                     condition == "unrelated_cat" ~ "Categorical",
+                                     condition == "mediated" ~ "Mediated",
+                                     condition == "unrelated_med" ~ "Mediated"),
+         # creating a column for distractor relatedness
+         distractor_relatedness = case_when(condition == "category" ~ "related",
+                                 condition == "mediated" ~ "related",
+                                 condition == "unrelated_cat" ~ "unrelated",
+                                 condition == "unrelated_med" ~ "unrelated")) |>
+  # coding new columns as factors
+  mutate(distractor_type = as.factor(distractor_type),
+         distractor_relatedness = as.factor(distractor_relatedness)) |>
+  # removing unnecessary columns for aesthetics
+  select(-condition, -run, -SOA, -accuracy)
+
+# double checking levels
+levels(aud$distractor_type)
+levels(aud$distractor_relatedness)
+# changing contrasts for sum-coding
+contrasts(aud$distractor_type) <- c(-0.5, 0.5)
+contrasts(aud$distractor_relatedness) <- c(0.5, -0.5)
+
+```
+
+## Smallest effect size of interest
+
+We focus our buddy challenge on Experiment 1 from Mascelloni et al. (2021). The original specific research question that we focused on for this assignment was whether a mediated semantic interference effect could be shown using a picture naming methodology. As an example of what this means, it would be participants being slower (taking more miliseconds) at naming the picture of a bat after being exposed to the prime "dog" due to the interference created by the potentially mediated activated word "cat". The overarching big picture research question is whether a cascade model of lexical retrieval is more correct than a sequential model. 
+
+Establishing a SESOI has been challenging. In our case, we need to agree on the number of ms that we would find convincing as a difference between conditions, beyond pure chance or measurement error. In order to do so, we looked at the literature on mediated phonological-semantic priming to try to find meta-analysis that would give us an idea of what size we would consider meaningful. We unfortunately found no such meta-analysis. The closest we could find was a book chapter by Kerr et al. (in press). However, said chapter does not provide anything that would give us any help choosing a SESOI. The closest we find to putting things into number is "lexical processing around 175ms and phonological form
+encoding some 100ms later around 250-300ms" (Kerr et al., in press:19). Given that the range given for the phonological encoding varies by 50 ms, this is potentially the closest we get to something resembling a number of ms to have as a meaningful difference. 
+
+We tried to look at the measurement error of the equipment itself to give us a pointer towards what we could consider a SESOI. The program used in Mascelloni et al. (2021) to quantify the reaction times is Chronset (Roux et al., 2017). We were unable to find any reported measurement error of that software.
+
+Therefore, we decided to define our SESOI based on the wiggle room provided in Kerr et al. (2021) for phonological form encoding, which is 50 ms.
+
+## Rerun of our hypothesis test using BF and ROPE
+
+```{r, reruning your hypothesis test combining the concepts of Bayes Factor (BF) and Regions of Practical Equivalence (ROPE)}
+
+
+# Here we set up the model we used in part 4, with weakly informative priors
+model <- bf(rt ~ distractor_type * distractor_relatedness + 
+                    (1 + distractor_type * distractor_relatedness | participant) + 
+                    (1 + distractor_type * distractor_relatedness | pic) + 
+                    (1 + distractor_relatedness | distractor_word))
+
+get_prior(maximal, aud, family = "gaussian")
+
+weak_priors <- c(prior(normal(718, 220), class = "Intercept"),
+                 prior(normal(0, 220), class = "b", coef = "distractor_relatedness1"),
+              prior(normal(0, 220), class = "b", coef = "distractor_type1"),
+              prior(normal(0, 220), class = "b", coef = "distractor_type1:distractor_relatedness1"),
+              prior(lkj(1), class = 'cor'),
+              prior(cauchy(0, 3), class = 'sd', group = 'distractor_word'),
+              prior(cauchy(0, 3), class = 'sd', group = 'participant'),
+              prior(cauchy(0, 3), class = 'sd', group = 'pic'),
+              prior(normal(0, 138), class = "sigma"))
+              
+
+proper_model <- brm(
+  formula = maximal,
+  data = aud,
+  prior = weak_priors,
+  family = gaussian(),
+  chains = 4,
+  iter = 2000,
+  warmup = 1000,
+  thin = 1, 
+  seed = 42,
+  cores = 4        
+)
+
+
+
+```
+
+## Run a sensitivity analyses for different ROPES and priors
+
+```{r, sensitivity analyses}
+
+
+```
+
+## Interpreting the results
+
+```{r, interpreting}
+#| label: interpret_sim
+
+summary(proper_model)
+
+proper_model |> 
+  gather_draws(b_distractor_relatedness1, b_distractor_type1, `b_distractor_type1:distractor_relatedness1`) |> 
+  # plot
+  ggplot(aes(x = .value,
+             y = .variable)) +
+    stat_halfeye() +
+    geom_vline(xintercept = 0,
+               lty = "dashed") +
+  labs(x = "posterior estimate for reaction times",
+       y = "") +
+  theme_minimal()
+
+
+p_direction(proper_model)
+
+
+```
