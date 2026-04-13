@@ -9,11 +9,15 @@ editor: visual
 
 TASK, DELETE LATER:
 
-Define the smallest effect size of interest for the original research question and do a literature research to justify your choice.
+# Define the smallest effect size of interest for the original research question and do a literature research to justify your choice.
 
-rerun your hypothesis test combining the concepts of Bayes Factor (BF) and Regions of Practical Equivalence (ROPE) (according to Roettger & Franke's method, 2025)
+# rerun your hypothesis test combining the concepts of Bayes Factor (BF) and Regions of Practical Equivalence (ROPE) (according to Roettger & Franke's method, 2025)
 
-run a sensitivity analyses for different ROPES and priors; write up the results accordingly. save the analysis and report in your Github repository Each buddy group leader additionally submits their report as a markdown (.qmd) and knitted pdf file here.
+# run a sensitivity analyses for different ROPES and priors; 
+
+write up the results accordingly.
+
+save the analysis and report in your Github repository Each buddy group leader additionally submits their report as a markdown (.qmd) and knitted pdf file here.
 
 Naming convention for files: groupname_part5
 
@@ -146,17 +150,46 @@ proper_model <- brm(
 )
 # looking at model output
 proper_model
-# chaning the sd-priors had a big influence on the 95% confidence interval of the
-# intercept, which now is [701.77, 803.42]. It increased arroud 12ms compared to
-# the previous model [709.81, 799.08]. However, the mean of the estimate didn't
-# change much, only 0.78 ms. For the distractor type, the estimate changes only 
-# 0.32ms, the 95% CI changed from [-7.42, 27.92] to [-7.33, 29.52]. The change does
-# not lead to differnt signs and is quite small compared to the change foundin the
-# other coefficiant, distractor relatedness where it now is [7.95, 32.41] compared
-# to the previos 95% CI of [10.67, 30.34]. The interaction is affected the most
-where the interval increased from [-27.12, 11.64] to [-30.12, 14.10].
+# changing the sd-priors had a big influence on the 95% confidence interval of
+# the intercept, which now is [701.77, 803.42]. It increased around 12ms compared # to the previous model [709.81, 799.08]. However, the mean of the estimate 
+# didn't change much, only 0.78 ms. For the distractor type, the estimate changes
+# only 0.32ms, the 95% CI changed from [-7.42, 27.92] to [-7.33, 29.52]. The
+# change does not lead to different signs and is quite small compared to the 
+# change found in the other coefficient, distractor relatedness where it now is 
+# [7.95, 32.41] compared to the previous 95% CI of [10.67, 30.34]. The 
+# interaction is affected the most where the interval increased from 
+# [-27.12, 11.64] to [-30.12, 14.10].
+
+```
+## Interpreting the results
+
+```{r, interpreting}
+#| label: interpret_sim
+
+summary(proper_model)
+
+proper_model |> 
+  gather_draws(b_distractor_relatedness1, b_distractor_type1, `b_distractor_type1:distractor_relatedness1`) |> 
+  # plot
+  ggplot(aes(x = .value,
+             y = .variable)) +
+    stat_halfeye() +
+    geom_vline(xintercept = 0,
+               lty = "dashed") +
+  labs(x = "posterior estimate for reaction times",
+       y = "") +
+  theme_minimal()
 
 
+p_direction(proper_model)
+
+
+```
+
+
+## Run a sensitivity analyses for different ROPES and priors
+
+```{r, sensitivity analyses Part I}
 # using our SESOI to define our ROPEs
 rope <- c(-50,50)
 bf_rope_type <- bayesfactor_rope(posterior = proper_model,
@@ -177,11 +210,6 @@ bf_rope_inter
 # type 0.00000807
 # relatedness 0.0000578
 # interaction 0.0000507
-```
-
-## Run a sensitivity analyses for different ROPES and priors
-
-```{r, sensitivity analyses - different priors}
 
 # setting priors that are half as wide as our original priors
 priors_110 <- c(prior(normal(718, 220), class = "Intercept"),
@@ -223,7 +251,7 @@ bf_rope_inter_110 <- bayesfactor_rope(posterior = narrow_model,
 bf_rope_type_110
 bf_rope_related_110
 bf_rope_inter_110
-# our results
+# our results - rope = 50, narrow priors model
 # type 0.0000245
 # relatedness 0.0000420
 # interaction 0.000182
@@ -268,13 +296,14 @@ bf_rope_inter_440 <- bayesfactor_rope(posterior = wide_model,
 bf_rope_type_440
 bf_rope_related_440
 bf_rope_inter_440
-# our results
+# our results - rope = 50, wide priors model
 # type 0.0000120
 # relatedness 0.0000157
 # interaction 0.0000994
 ```
 
-```{r, sensitivity analyses - smaller rope}
+```{r, sensitivity analyses Part II}
+{echo = FALSE}
 # rerunning the three different models with smaller rope
 rope25 <- c(-25,25)
 # As we dont have a very good reason, other than this number being the best we
@@ -337,17 +366,16 @@ bf_rope25_type_440
 bf_rope25_related_440
 bf_rope25_inter_440
 # our results - rope = 25, wide priors model
-# type 
-# relatedness 
-# interaction 
+# type 0.003
+# relatedness 0.014
+# interaction 0.003
 ```
 
-```{r, sensitivity analyses - "in between" rope}
-# rerunning the three different models with rope that's in between our original 
-# [-50,50] and the previous [-25,25]
+```{r, sensitivity analyses Part III}
+
 rope37.5 <- c(-37.5,37.5)
-# For our third ROPE we decided to go with the middle between the large and small
-# interval used before. 
+# Now, we are going to look how BF changes if our ROPE is in between the two we have used above. 
+
 # narrow priors model
 bf_rope37.5_type_110 <- bayesfactor_rope(posterior = narrow_model,
                  null = rope37.5,
@@ -363,73 +391,104 @@ bf_rope37.5_inter_110 <- bayesfactor_rope(posterior = narrow_model,
 bf_rope37.5_type_110
 bf_rope37.5_related_110
 bf_rope37.5_inter_110
-# our results - rope = 25, narrow priors model
-# type 0.016
-# relatedness 0.063
-# interaction 0.014
+# our results - rope = 37.5, narrow priors model
+# type 0.000826
+# relatedness 0.003
+# interaction 0.002
 
 # original model
-bf_rope25_type <- bayesfactor_rope(posterior = proper_model,
-                 null = rope25,
+bf_rope37.5_type <- bayesfactor_rope(posterior = proper_model,
+                 null = rope37.5,
                  parameter = 'b_distractor_type1')
 
-bf_rope25_related <- bayesfactor_rope(posterior = proper_model,
-                 null = rope25,
+bf_rope37.5_related <- bayesfactor_rope(posterior = proper_model,
+                 null = rope37.5,
                  parameter = 'b_distractor_relatedness1')
 
-bf_rope25_inter <- bayesfactor_rope(posterior = proper_model,
-                 null = rope25,
+bf_rope37.5_inter <- bayesfactor_rope(posterior = proper_model,
+                 null = rope37.5,
                  parameter = 'b_distractor_type1:distractor_relatedness1')
-bf_rope25_type
-bf_rope25_related
-bf_rope25_inter
+bf_rope37.5_type
+bf_rope37.5_related
+bf_rope37.5_inter
+# our results - rope = 37.5, original model
+# type 0.000361
+# relatedness 0.000857
+# interaction 0.000708
+
+# wide priors model
+bf_rope37.5_type_440 <- bayesfactor_rope(posterior = wide_model,
+                 null = rope37.5,
+                 parameter = 'b_distractor_type1')
+
+bf_rope37.5_related_440 <- bayesfactor_rope(posterior = wide_model,
+                 null = rope37.5,
+                 parameter = 'b_distractor_relatedness1')
+
+bf_rope37.5_inter_440 <- bayesfactor_rope(posterior = wide_model,
+                 null = rope37.5,
+                 parameter = 'b_distractor_type1:distractor_relatedness1')
+bf_rope37.5_type_440
+bf_rope37.5_related_440
+bf_rope37.5_inter_440
+# our results - rope = 37.5, wide priors model
+# type 0.000194
+# relatedness 0.000454
+# interaction 0.000578
+
+```
+```{r, overview}
+{echo = FALSE}
+
+# our results - rope = 50, narrow priors model
+# type 0.0000245
+# relatedness 0.0000420
+# interaction 0.000182
+# our results - rope = 50, original model
+# type 0.00000807
+# relatedness 0.0000578
+# interaction 0.0000507
+# our results - rope = 50, wide priors model
+# type 0.0000120
+# relatedness 0.0000157
+# interaction 0.0000994
+
+# our results - rope = 25, narrow priors model  !!
+# type 0.016 (very strong)
+# relatedness 0.063 (strong)
+# interaction 0.014 (very strong)
 # our results - rope = 25, original model
 # type 0.007
 # relatedness 0.027
 # interaction 0.008
-
-# wide priors model
-bf_rope25_type_440 <- bayesfactor_rope(posterior = wide_model,
-                 null = rope25,
-                 parameter = 'b_distractor_type1')
-
-bf_rope25_related_440 <- bayesfactor_rope(posterior = wide_model,
-                 null = rope25,
-                 parameter = 'b_distractor_relatedness1')
-
-bf_rope25_inter_440 <- bayesfactor_rope(posterior = wide_model,
-                 null = rope25,
-                 parameter = 'b_distractor_type1:distractor_relatedness1')
-bf_rope25_type_440
-bf_rope25_related_440
-bf_rope25_inter_440
 # our results - rope = 25, wide priors model
-# type 
-# relatedness 
-# interaction 
+# type 0.003
+# relatedness 0.014 (very strong)
+# interaction 0.003
+
+# our results - rope = 37.5, narrow priors model
+# type 0.000826
+# relatedness 0.003
+# interaction 0.002
+# our results - rope = 37.5, original model
+# type 0.000361
+# relatedness 0.000857
+# interaction 0.000708
+# our results - rope = 37.5, wide priors model
+# type 0.000194
+# relatedness 0.000454
+# interaction 0.000578
 ```
 
-## Interpreting the results
+# Interpretation
+In our sensitivity analyses we used three different ropes and three different prior, leading to 9 different combinations. For each one, we looked at the three parameters: distractor type, distractor relatedness and the interaction between these two.
+Even though the Bayes Factors change, all results are in favour for the null hypothesis. The evidence ranges from strong to extreme evidence against the alternative analyses. Even though we used three different priors, the results for ROPE [-50,50] always show extreme evidence for the hypothesis, just like the 
+ROPE [-37.5, 37.5] results. 
+When we set the ROPE to [-25,25] however, only the original prior setting gave us extreme evidence against the null. When we used narrow priors, the distractor type and the interaction term showed very strong evidence against the NUll, while the distractor relatedness showed only strong evidence. Using wide priors led to very strong evidence for distractor relatedness, whereas the other two parameters showed extreme evidence against the alternative hypothesis.
+This shows that distractor relatedness varies the most through the analysis, however, all results are still in favour of the null hypothesis.
 
-```{r, interpreting}
-#| label: interpret_sim
+In the original paper, the authors claim that their results show evidence for the mediated phonological-semantic effect. The null hypothesis thus, is that there is no such effect, meaning that reaction times does not differ between the different conditions. While we in the previous part of the buddy challenge agreed with the authors that there is such an effect, we now see that given our self-chosen ROPEs, there is actually no evidence at all in favour of the previous and original claim. 
+Against all odds, every evidence that we got from our sensitivity analyses, contradicts our previous believe. In our previous report, we claim that distractor relatedness has a stronger effect in how participants react. However, in this case, all nine combinations show that there is no such effect that influences the speed of naming pictures.  
 
-summary(proper_model)
+We are aware that setting even smaller ROPEs might change this, but as there is no reason for that found in literature, this seems more like a way of manipulating the data to prove your hypothesis. 
 
-proper_model |> 
-  gather_draws(b_distractor_relatedness1, b_distractor_type1, `b_distractor_type1:distractor_relatedness1`) |> 
-  # plot
-  ggplot(aes(x = .value,
-             y = .variable)) +
-    stat_halfeye() +
-    geom_vline(xintercept = 0,
-               lty = "dashed") +
-  labs(x = "posterior estimate for reaction times",
-       y = "") +
-  theme_minimal()
-
-
-p_direction(proper_model)
-
-
-```
