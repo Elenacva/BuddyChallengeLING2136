@@ -7,22 +7,6 @@ editor: visual
 
 # Buddy challenge part 5: SESOI, Bayes Factor and ROPEs
 
-TASK, DELETE LATER:
-
-# Define the smallest effect size of interest for the original research question and do a literature research to justify your choice.
-
-# rerun your hypothesis test combining the concepts of Bayes Factor (BF) and Regions of Practical Equivalence (ROPE) (according to Roettger & Franke's method, 2025)
-
-# run a sensitivity analyses for different ROPES and priors; 
-
-write up the results accordingly.
-
-save the analysis and report in your Github repository Each buddy group leader additionally submits their report as a markdown (.qmd) and knitted pdf file here.
-
-Naming convention for files: groupname_part5
-
-END OF DELETE LATER
-
 ## Seting up working directory, packages and data
 
 ```{r, packages and workind directory}
@@ -480,7 +464,7 @@ bf_rope37.5_inter_440
 # interaction 0.000578
 ```
 
-# Interpretation
+## Interpretation
 In our sensitivity analyses we used three different ropes and three different prior, leading to 9 different combinations. For each one, we looked at the three parameters: distractor type, distractor relatedness and the interaction between these two.
 Even though the Bayes Factors change, all results are in favour for the null hypothesis. The evidence ranges from strong to extreme evidence against the alternative analyses. Even though we used three different priors, the results for ROPE [-50,50] always show extreme evidence for the hypothesis, just like the 
 ROPE [-37.5, 37.5] results. 
